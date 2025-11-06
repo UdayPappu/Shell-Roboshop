@@ -1,0 +1,25 @@
+#!/bin/bash
+
+AMI_ID="ami-09c813fb71547fc4f"
+SG_ID="sg-075219685ee98df3d"
+INSTANCES=("mongodb" "redis" "mysql" "rabbitmq" "catalogue" "user" "cart" "shipping" 
+"payment" "dispatch" "frontend")
+ZONE_ID="Z02152192PADH0ABCE6WY"
+DOMAIN_NAME="udaypappu.fun"
+
+for instance in ${INSTANCES[@]}
+do
+INSTANCE_ID=$(aws ec2 run-instances   --image-id ami-09c813fb71547fc4f   --instance-type t3.micro  
+  --security-group-ids sg-075219685ee98df3d   --tag-specifications "ResourceType=instance,
+  Tags=[{Key=Name,Value=test}]"   --query "Instances[0].InstanceId"   --output text)
+  if [ $instance != "frontend" ]
+  then
+     IP=aws ec2 describe-instances --instance-ids i-05de2bcb1ecce79a7 
+     --query "Reservations[0].Instances[0].PrivateIpAddress" --output text
+     echo "$instance IP address is $IP"
+     else
+     IP=aws ec2 describe-instances --instance-ids i-05de2bcb1ecce79a7 
+     --query "Reservations[0].Instances[0].PublicIpAddress" --output text
+     echo "$instance IP address is $IP"
+
+done

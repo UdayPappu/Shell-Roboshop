@@ -22,7 +22,7 @@ INSTANCE_ID=$(aws ec2 run-instances   --image-id ami-09c813fb71547fc4f   --insta
         fi
      echo "$instance IP address is $IP"
 
-done
+
 
 aws route53 change-resource-record-sets \
   --hosted-zone-id $ZONE_ID \
@@ -30,15 +30,16 @@ aws route53 change-resource-record-sets \
     "Comment": "Creating or updating a record set for Cognito endpoint",
     "Changes": [
       {
-        "Action"            : "CREATE",
+        "Action"            : "UPSERT",
         "ResourceRecordSet" : {
-          "Name"            : "'$recordname'.mydoamin.com.",
-          "Type"            : "CNAME",
-          "TTL"             : 120,
+          "Name"            : "'$instance'.'$DOMAIN_NAME'",
+          "Type"            : "A",
+          "TTL"             : 1,
           "ResourceRecords" : [
-            { "Value": "'$recordvalue'" }
+            { "Value": "'$IP'" }
           ]
         }
       }
     ]
   }'
+  done

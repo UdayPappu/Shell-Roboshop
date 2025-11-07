@@ -13,11 +13,11 @@ INSTANCE_ID=$(aws ec2 run-instances   --image-id ami-09c813fb71547fc4f   --insta
   Tags=[{Key=Name,Value=$instance}]"   --query "Instances[0].InstanceId"   --output text)
   if [ $instance != "frontend" ]
   then
-     IP=$(aws ec2 describe-instances --instance-ids i-05de2bcb1ecce79a7  --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
+     IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID  --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
      echo "$instance IP address is $IP"
 
         else
-     IP=$(aws ec2 describe-instances --instance-ids i-05de2bcb1ecce79a7 --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+     IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
 
         fi
      echo "$instance IP address is $IP"

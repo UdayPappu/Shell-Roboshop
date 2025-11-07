@@ -2,45 +2,59 @@
 
 AMI_ID="ami-09c813fb71547fc4f"
 SG_ID="sg-075219685ee98df3d"
-INSTANCES=("mongodb" "redis" "mysql" "rabbitmq" "catalogue" "user" "cart" "shipping" 
-"payment" "dispatch" "frontend")
+INSTANCE_TYPE="t3.micro"   # change if needed
+INSTANCES=("mongodb" "redis" "mysql" "rabbitmq" "catalogue" "user" "cart" "shipping" "payment" "dispatch" "frontend")
 ZONE_ID="Z02152192PADH0ABCE6WY"
 DOMAIN_NAME="udaypappu.fun"
 
-for instance in ${INSTANCES[@]}
-do
-INSTANCE_ID=$(aws ec2 run-instances   --image-id ami-09c813fb71547fc4f   --instance-type t3.micro  --security-group-ids sg-075219685ee98df3d   --tag-specifications "ResourceType=instance,
-  Tags=[{Key=Name,Value=$instance}]"   --query "Instances[0].InstanceId"   --output text)
-  aws ec2 wait instance-running --instance-ids $INSTANCE_ID
-  if [ $instance != "frontend" ]
-  then
-     IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID  --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
-     echo "$instance IP address is $IP"
+for instance in "${INSTANCES[@]}"; do
+  unset INSTANCE_ID
+  ERRFILE=$(mktemp)
 
-        else
-     IP=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+  INSTANCE_ID=$(aws ec2 run-instances \
+    --image-id "$AMI_ID" \
+    --instance-type "$INSTANCE_TYPE" \
+    --security-group-ids "$SG_ID" \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$instance}]" \
+    --query "Instances[0].InstanceId" --output text 2>"$ERRFILE" || true)
 
-        fi
-     echo "$instance IP address is $IP"
+  if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" = "None" ]; then
+    echo "Launch failed for $instance — reason: $(tr '\n' ' ' <"$ERRFILE")"
+    rm -f "$ERRFILE"
+    continue
+  fi
+  rm -f "$ERRFILE"
 
+  echo "Launched $instance ($INSTANCE_ID). Waiting for running..."
+  aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
 
+  if [ "$instance" != "frontend" ]; then
+    IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
+  else
+    IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+  fi
 
-aws route53 change-resource-record-sets \
-  --hosted-zone-id $ZONE_ID \
-  --change-batch '{
-    "Comment": "Creating or updating a record set for Cognito endpoint",
-    "Changes": [
-      {
-        "Action"            : "UPSERT",
-        "ResourceRecordSet" : {
-          "Name"            : "'$instance'.'$DOMAIN_NAME'",
-          "Type"            : "A",
-          "TTL"             : 1,
-          "ResourceRecords" : [
-            { "Value": "'$IP'" }
-          ]
+  if [ -z "$IP" ] || [ "$IP" = "None" ]; then
+    echo "No IP for $instance ($INSTANCE_ID) — skipping Route53 update."
+    continue
+  fi
+
+  echo "$instance IP address is $IP"
+
+  aws route53 change-resource-record-sets \
+    --hosted-zone-id "$ZONE_ID" \
+    --change-batch '{
+      "Comment": "Creating or updating a record for '"$instance"'",
+      "Changes": [
+        {
+          "Action": "UPSERT",
+          "ResourceRecordSet": {
+            "Name": "'"$instance"'.'"$DOMAIN_NAME"'",
+            "Type": "A",
+            "TTL": 60,
+            "ResourceRecords": [{"Value": "'"$IP"'"}]
+          }
         }
-      }
-    ]
-  }'
-  done
+      ]
+    }'
+done

@@ -7,7 +7,9 @@ INSTANCES=("mongodb" "redis" "mysql" "rabbitmq" "catalogue" "user" "cart" "shipp
 ZONE_ID="Z02152192PADH0ABCE6WY"
 DOMAIN_NAME="udaypappu.fun"
 
-for instance in "${INSTANCES[@]}"; do
+#for instance in "${INSTANCES[@]}"; 
+for instance in $@
+do
   unset INSTANCE_ID
   ERRFILE=$(mktemp)
 
@@ -28,10 +30,13 @@ for instance in "${INSTANCES[@]}"; do
   echo "Launched $instance ($INSTANCE_ID). Waiting for running..."
   aws ec2 wait instance-running --instance-ids "$INSTANCE_ID"
 
-  if [ "$instance" != "frontend" ]; then
+  if [ "$instance" != "frontend" ]; 
+  then
     IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PrivateIpAddress" --output text)
+    RECORD_NAME="$instance.$DOMAIN_NAME"
   else
     IP=$(aws ec2 describe-instances --instance-ids "$INSTANCE_ID" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+    RECORD_NAME="$DOMAIN_NAME"
   fi
 
   if [ -z "$IP" ] || [ "$IP" = "None" ]; then
